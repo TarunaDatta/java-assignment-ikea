@@ -29,6 +29,34 @@ public class WarehouseEndpointIT {
   }
 
   @Nested
+  class GetWarehouse {
+
+    @Test
+    void returnsWarehouseById() {
+      given()
+          .when()
+          .get(PATH + "/1")
+          .then()
+          .statusCode(200)
+          .body("id", equalTo("1"))
+          .body("businessUnitCode", equalTo("MWH.001"))
+          .body("location", equalTo("ZWOLLE-001"))
+          .body("capacity", equalTo(100))
+          .body("stock", equalTo(10));
+    }
+
+    @Test
+    void returnsNotFoundForUnknownWarehouse() {
+      given().when().get(PATH + "/999999").then().statusCode(404);
+    }
+
+    @Test
+    void returnsNotFoundForInvalidWarehouseId() {
+      given().when().get(PATH + "/invalid").then().statusCode(404);
+    }
+  }
+
+  @Nested
   class CreateWarehouse {
 
     @Test

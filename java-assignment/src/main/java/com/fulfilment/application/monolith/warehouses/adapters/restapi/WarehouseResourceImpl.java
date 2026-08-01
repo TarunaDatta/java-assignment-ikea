@@ -9,6 +9,7 @@ import jakarta.enterprise.context.RequestScoped;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
 import jakarta.validation.constraints.NotNull;
+import jakarta.ws.rs.NotFoundException;
 import jakarta.ws.rs.container.ContainerRequestContext;
 import jakarta.ws.rs.container.ContainerResponseContext;
 import jakarta.ws.rs.container.ContainerResponseFilter;
@@ -45,8 +46,21 @@ public class WarehouseResourceImpl implements WarehouseResource {
 
   @Override
   public Warehouse getAWarehouseUnitByID(String id) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'getAWarehouseUnitByID'");
+    final Long warehouseId;
+    try {
+      warehouseId = Long.valueOf(id);
+    } catch (NumberFormatException exception) {
+      throw new NotFoundException("Warehouse with id " + id + " does not exist.");
+    }
+
+    var warehouse = warehouseRepository.findById(warehouseId);
+    if (warehouse == null) {
+      throw new NotFoundException("Warehouse with id " + id + " does not exist.");
+    }
+
+    var response = toWarehouseResponse(warehouse.toWarehouse());
+    response.setId(warehouse.id.toString());
+    return response;
   }
 
   @Override
