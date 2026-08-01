@@ -1,5 +1,6 @@
 package com.fulfilment.application.monolith.warehouses.domain.usecases;
 
+import com.fulfilment.application.monolith.warehouses.domain.exceptions.WarehouseConflictException;
 import com.fulfilment.application.monolith.warehouses.domain.exceptions.WarehouseValidationException;
 import com.fulfilment.application.monolith.warehouses.domain.models.Location;
 import com.fulfilment.application.monolith.warehouses.domain.models.Warehouse;
@@ -47,7 +48,7 @@ public class CreateWarehouseUseCase implements CreateWarehouseOperation {
       throw new WarehouseValidationException("Business unit code is required.");
     }
     if (warehouseStore.findByBusinessUnitCode(businessUnitCode) != null) {
-      throw new WarehouseValidationException(
+      throw new WarehouseConflictException(
           "A warehouse with business unit code " + businessUnitCode + " already exists.");
     }
   }

@@ -7,6 +7,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.fulfilment.application.monolith.warehouses.domain.exceptions.WarehouseConflictException;
 import com.fulfilment.application.monolith.warehouses.domain.exceptions.WarehouseValidationException;
 import com.fulfilment.application.monolith.warehouses.domain.models.Location;
 import com.fulfilment.application.monolith.warehouses.domain.models.Warehouse;
@@ -57,15 +58,18 @@ class CreateWarehouseUseCaseTest {
   }
 
   @Test
-  void rejectsDuplicateBusinessUnitCode() {
-    Warehouse warehouse = warehouse("MWH.001", "EINDHOVEN-001", 40, 20);
-    when(warehouseStore.findByBusinessUnitCode("MWH.001")).thenReturn(new Warehouse());
+    void rejectsDuplicateBusinessUnitCode() {
+      Warehouse warehouse = warehouse("MWH.001", "EINDHOVEN-001", 40, 20);
+      when(warehouseStore.findByBusinessUnitCode("MWH.001")).thenReturn(new Warehouse());
 
-    assertValidation(
-        "A warehouse with business unit code MWH.001 already exists.",
-        () -> useCase.create(warehouse));
+      WarehouseConflictException exception =
+          assertThrows(WarehouseConflictException.class, () -> useCase.create(warehouse));
 
-    verify(warehouseStore, never()).create(warehouse);
+      assertEquals(
+          "A warehouse with business unit code MWH.001 already exists.",
+          exception.getMessage());
+
+      verify(warehouseStore, never()).create(warehouse);
   }
 
   @Test

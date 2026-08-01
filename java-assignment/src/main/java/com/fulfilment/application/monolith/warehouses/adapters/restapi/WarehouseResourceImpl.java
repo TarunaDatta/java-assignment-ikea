@@ -2,6 +2,7 @@ package com.fulfilment.application.monolith.warehouses.adapters.restapi;
 
 import com.fulfilment.application.monolith.fulfilments.FulfilmentAssignmentRepository;
 import com.fulfilment.application.monolith.warehouses.adapters.database.WarehouseRepository;
+import com.fulfilment.application.monolith.warehouses.domain.exceptions.WarehouseConflictException;
 import com.fulfilment.application.monolith.warehouses.domain.exceptions.WarehouseValidationException;
 import com.fulfilment.application.monolith.warehouses.domain.ports.ArchiveWarehouseOperation;
 import com.fulfilment.application.monolith.warehouses.domain.ports.CreateWarehouseOperation;
@@ -60,7 +61,10 @@ public class WarehouseResourceImpl implements WarehouseResource {
       throw new NotFoundException("Warehouse with id " + id + " does not exist.");
     }
 
-    var warehouse = warehouseRepository.findById(warehouseId);
+    var warehouse =
+        warehouseRepository
+            .find("id = ?1 and archivedAt is null", warehouseId)
+            .firstResult();
     if (warehouse == null) {
       throw new NotFoundException("Warehouse with id " + id + " does not exist.");
     }
@@ -86,7 +90,7 @@ public class WarehouseResourceImpl implements WarehouseResource {
       throw new NotFoundException("Warehouse with id " + id + " does not exist.");
     }
     if (fulfilmentAssignmentRepository.countByWarehouse(warehouse.id) > 0) {
-      throw new WarehouseValidationException(
+      throw new WarehouseConflictException(
           "Warehouse cannot be archived while it has active fulfilment assignments.");
     }
 
@@ -142,6 +146,18 @@ public class WarehouseResourceImpl implements WarehouseResource {
     public Response toResponse(WarehouseValidationException exception) {
       return Response.status(Response.Status.BAD_REQUEST)
           .entity(Map.of("code", 400, "error", exception.getMessage()))
+          .build();
+    }
+  }
+
+  @Provider
+  public static class ConflictExceptionMapper
+      implements ExceptionMapper<WarehouseConflictException> {
+
+    @Override
+    public Response toResponse(WarehouseConflictException exception) {
+      return Response.status(Response.Status.CONFLICT)
+          .entity(Map.of("code", 409, "error", exception.getMessage()))
           .build();
     }
   }

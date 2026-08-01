@@ -85,6 +85,19 @@ class WarehouseResourceTest {
     void returnsNotFoundForInvalidWarehouseId() {
       given().when().get(PATH + "/invalid").then().statusCode(404);
     }
+
+    @Test
+    void returnsNotFoundForArchivedWarehouse() {
+      long id = createWarehouse(TEST_CODE_PREFIX + "GET-ARCHIVED", true);
+
+      given()
+          .when()
+          .get(PATH + "/{id}", id)
+          .then()
+          .statusCode(404)
+          .body("code", equalTo(404))
+          .body("error", equalTo("Warehouse with id " + id + " does not exist."));
+    }
   }
 
   @Nested
@@ -115,8 +128,8 @@ class WarehouseResourceTest {
           .when()
           .post(PATH)
           .then()
-          .statusCode(400)
-          .body("code", equalTo(400))
+          .statusCode(409)
+          .body("code", equalTo(409))
           .body("error", equalTo("A warehouse with business unit code MWH.001 already exists."));
     }
 

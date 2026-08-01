@@ -35,6 +35,8 @@ paths:
         
         '400':
           description: Invalid request parameters
+        '409':
+          description: A warehouse with the business unit code already exists
 
   /warehouse/{id}:
     get:
@@ -69,6 +71,8 @@ paths:
           description: Warehouse unit archived
         '404':
           description: Warehouse unit not found
+        '409':
+          description: Warehouse unit has active fulfilment assignments
 
   /warehouse/{businessUnitCode}/replacement:
     post:

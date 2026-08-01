@@ -47,7 +47,8 @@ class FulfilmentAssignmentLifecycleTest {
         .when()
         .delete("/warehouse/1")
         .then()
-        .statusCode(400)
+        .statusCode(409)
+        .body("code", equalTo(409))
         .body(
             "error",
             equalTo("Warehouse cannot be archived while it has active fulfilment assignments."));
