@@ -69,9 +69,7 @@ public class WarehouseResourceImpl implements WarehouseResource {
       throw new NotFoundException("Warehouse with id " + id + " does not exist.");
     }
 
-    var response = toWarehouseResponse(warehouse.toWarehouse());
-    response.setId(warehouse.id.toString());
-    return response;
+    return toWarehouseResponse(warehouse.toWarehouse());
   }
 
   @Override
@@ -130,6 +128,9 @@ public class WarehouseResourceImpl implements WarehouseResource {
   private Warehouse toWarehouseResponse(
       com.fulfilment.application.monolith.warehouses.domain.models.Warehouse warehouse) {
     var response = new Warehouse();
+    if (warehouse.id != null) {
+      response.setId(warehouse.id.toString());
+    }
     response.setBusinessUnitCode(warehouse.businessUnitCode);
     response.setLocation(warehouse.location);
     response.setCapacity(warehouse.capacity);

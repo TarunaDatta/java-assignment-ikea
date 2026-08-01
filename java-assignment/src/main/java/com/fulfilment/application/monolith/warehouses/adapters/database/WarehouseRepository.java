@@ -23,7 +23,8 @@ public class WarehouseRepository implements WarehouseStore, PanacheRepository<Db
     dbWarehouse.stock = warehouse.stock;
     dbWarehouse.createdAt = warehouse.createdAt;
     dbWarehouse.archivedAt = warehouse.archivedAt;
-    persist(dbWarehouse);
+    persistAndFlush(dbWarehouse);
+    warehouse.id = dbWarehouse.id;
   }
 
   @Override

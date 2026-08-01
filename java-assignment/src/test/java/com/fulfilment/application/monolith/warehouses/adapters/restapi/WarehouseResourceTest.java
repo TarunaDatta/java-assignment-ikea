@@ -4,6 +4,7 @@ import static io.restassured.RestAssured.given;
 import static org.hamcrest.CoreMatchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.not;
+import static org.hamcrest.Matchers.notNullValue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -55,7 +56,9 @@ class WarehouseResourceTest {
           .get(PATH)
           .then()
           .statusCode(200)
-          .body(containsString("MWH.001"), containsString("MWH.012"));
+          .body(containsString("MWH.001"), containsString("MWH.012"))
+          .body("find { it.businessUnitCode == 'MWH.001' }.id", equalTo("1"))
+          .body("find { it.businessUnitCode == 'MWH.012' }.id", equalTo("2"));
     }
   }
 
@@ -107,17 +110,29 @@ class WarehouseResourceTest {
     void createsWarehouseAndChangesResponseStatusToCreated() {
       String businessUnitCode = TEST_CODE_PREFIX + "CREATE";
 
+      String id =
+          given()
+              .contentType(ContentType.JSON)
+              .body(warehouseJson(businessUnitCode, "HELMOND-001", 40, 10))
+              .when()
+              .post(PATH)
+              .then()
+              .statusCode(201)
+              .body("id", notNullValue())
+              .body("businessUnitCode", equalTo(businessUnitCode))
+              .body("location", equalTo("HELMOND-001"))
+              .body("capacity", equalTo(40))
+              .body("stock", equalTo(10))
+              .extract()
+              .path("id");
+
       given()
-          .contentType(ContentType.JSON)
-          .body(warehouseJson(businessUnitCode, "HELMOND-001", 40, 10))
           .when()
-          .post(PATH)
+          .get(PATH + "/{id}", id)
           .then()
-          .statusCode(201)
-          .body("businessUnitCode", equalTo(businessUnitCode))
-          .body("location", equalTo("HELMOND-001"))
-          .body("capacity", equalTo(40))
-          .body("stock", equalTo(10));
+          .statusCode(200)
+          .body("id", equalTo(id))
+          .body("businessUnitCode", equalTo(businessUnitCode));
     }
 
     @Test

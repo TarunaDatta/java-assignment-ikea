@@ -3,6 +3,7 @@ package com.fulfilment.application.monolith.warehouses.adapters.restapi;
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.CoreMatchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.notNullValue;
 
 import io.quarkus.test.junit.QuarkusIntegrationTest;
 import io.restassured.http.ContentType;
@@ -32,6 +33,7 @@ public class WarehouseEndpointIT {
         .post(PATH)
         .then()
         .statusCode(201)
+        .body("id", notNullValue())
         .body("businessUnitCode", equalTo("MWH.IT.100"));
   }
 
