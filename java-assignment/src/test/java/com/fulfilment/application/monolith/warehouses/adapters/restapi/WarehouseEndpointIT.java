@@ -3,6 +3,7 @@ package com.fulfilment.application.monolith.warehouses.adapters.restapi;
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.CoreMatchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.not;
 
 import io.quarkus.test.junit.QuarkusIntegrationTest;
 import io.restassured.http.ContentType;
@@ -24,7 +25,7 @@ public class WarehouseEndpointIT {
           .get(PATH)
           .then()
           .statusCode(200)
-          .body(containsString("MWH.001"), containsString("MWH.012"), containsString("MWH.023"));
+          .body(containsString("MWH.001"), containsString("MWH.012"));
     }
   }
 
@@ -151,8 +152,24 @@ public class WarehouseEndpointIT {
 
     @Test
     void archivesWarehouse() {
-      // Archive endpoint coverage will be enabled when its implementation is completed.
+      given().when().delete(PATH + "/3").then().statusCode(204);
+
+      given().when().get(PATH).then().statusCode(200).body(not(containsString("MWH.023")));
+
+      // An archived warehouse is no longer active and cannot be archived again.
+      given().when().delete(PATH + "/3").then().statusCode(404);
     }
+
+    @Test
+    void returnsNotFoundForInvalidWarehouseId() {
+      given().when().delete(PATH + "/invalid").then().statusCode(404);
+    }
+
+    @Test
+    void returnsNotFoundForUnknownWarehouse() {
+      given().when().delete(PATH + "/999999").then().statusCode(404);
+    }
+
   }
 
   private String warehouseJson(

@@ -28,14 +28,20 @@ public class WarehouseRepository implements WarehouseStore, PanacheRepository<Db
 
   @Override
   public void update(Warehouse warehouse) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'replace'");
+    update(
+        "location = ?1, capacity = ?2, stock = ?3, createdAt = ?4, archivedAt = ?5 "
+            + "where businessUnitCode = ?6 and archivedAt is null",
+        warehouse.location,
+        warehouse.capacity,
+        warehouse.stock,
+        warehouse.createdAt,
+        warehouse.archivedAt,
+        warehouse.businessUnitCode);
   }
 
   @Override
   public void remove(Warehouse warehouse) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'remove'");
+    delete("businessUnitCode = ?1 and archivedAt is null", warehouse.businessUnitCode);
   }
 
   @Override

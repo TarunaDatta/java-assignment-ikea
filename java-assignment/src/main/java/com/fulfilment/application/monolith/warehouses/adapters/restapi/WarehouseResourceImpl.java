@@ -2,7 +2,9 @@ package com.fulfilment.application.monolith.warehouses.adapters.restapi;
 
 import com.fulfilment.application.monolith.warehouses.adapters.database.WarehouseRepository;
 import com.fulfilment.application.monolith.warehouses.domain.exceptions.WarehouseValidationException;
+import com.fulfilment.application.monolith.warehouses.domain.ports.ArchiveWarehouseOperation;
 import com.fulfilment.application.monolith.warehouses.domain.ports.CreateWarehouseOperation;
+import com.fulfilment.application.monolith.warehouses.domain.ports.ReplaceWarehouseOperation;
 import com.warehouse.api.WarehouseResource;
 import com.warehouse.api.beans.Warehouse;
 import jakarta.enterprise.context.RequestScoped;
@@ -23,7 +25,9 @@ import java.util.Map;
 public class WarehouseResourceImpl implements WarehouseResource {
 
   @Inject private WarehouseRepository warehouseRepository;
+  @Inject private ArchiveWarehouseOperation archiveWarehouseOperation;
   @Inject private CreateWarehouseOperation createWarehouseOperation;
+  @Inject private ReplaceWarehouseOperation replaceWarehouseOperation;
 
   @Override
   public List<Warehouse> listAllWarehousesUnits() {
@@ -64,17 +68,46 @@ public class WarehouseResourceImpl implements WarehouseResource {
   }
 
   @Override
+  @Transactional
   public void archiveAWarehouseUnitByID(String id) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'archiveAWarehouseUnitByID'");
+    final Long warehouseId;
+    try {
+      warehouseId = Long.valueOf(id);
+    } catch (NumberFormatException exception) {
+      throw new NotFoundException("Warehouse with id " + id + " does not exist.");
+    }
+
+    var warehouse = warehouseRepository.findById(warehouseId);
+    if (warehouse == null || warehouse.archivedAt != null) {
+      throw new NotFoundException("Warehouse with id " + id + " does not exist.");
+    }
+
+    archiveWarehouseOperation.archive(warehouse.toWarehouse());
   }
 
   @Override
+  @Transactional
   public Warehouse replaceTheCurrentActiveWarehouse(
       String businessUnitCode, @NotNull Warehouse data) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException(
-        "Unimplemented method 'replaceTheCurrentActiveWarehouse'");
+    if (businessUnitCode == null
+        || businessUnitCode.isBlank()
+        || warehouseRepository.findByBusinessUnitCode(businessUnitCode) == null) {
+      throw new NotFoundException(
+          "Warehouse with business unit code " + businessUnitCode + " does not exist.");
+    }
+    if (data == null) {
+      throw new WarehouseValidationException("Warehouse data is required.");
+    }
+
+    var warehouse = new com.fulfilment.application.monolith.warehouses.domain.models.Warehouse();
+    warehouse.businessUnitCode = businessUnitCode;
+    warehouse.location = data.getLocation();
+    warehouse.capacity = data.getCapacity();
+    warehouse.stock = data.getStock();
+    warehouse.createdAt = java.time.LocalDateTime.now();
+
+    replaceWarehouseOperation.replace(warehouse);
+    return toWarehouseResponse(warehouse);
   }
 
   private Warehouse toWarehouseResponse(
