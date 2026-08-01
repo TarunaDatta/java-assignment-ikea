@@ -2,60 +2,140 @@ package com.fulfilment.application.monolith.warehouses.adapters.restapi;
 
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.CoreMatchers.containsString;
+import static org.hamcrest.Matchers.equalTo;
 
 import io.quarkus.test.junit.QuarkusIntegrationTest;
+import io.restassured.http.ContentType;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 @QuarkusIntegrationTest
 public class WarehouseEndpointIT {
 
-  @Test
-  public void testSimpleListWarehouses() {
+  private static final String PATH = "/warehouse";
 
-    final String path = "warehouse";
+  @Nested
+  class ListWarehouses {
 
-    // List all, should have all 3 products the database has initially:
-    given()
-        .when()
-        .get(path)
-        .then()
-        .statusCode(200)
-        .body(containsString("MWH.001"), containsString("MWH.012"), containsString("MWH.023"));
+    @Test
+    void returnsAllWarehouses() {
+      given()
+          .when()
+          .get(PATH)
+          .then()
+          .statusCode(200)
+          .body(containsString("MWH.001"), containsString("MWH.012"), containsString("MWH.023"));
+    }
   }
 
-  @Test
-  public void testSimpleCheckingArchivingWarehouses() {
+  @Nested
+  class CreateWarehouse {
 
-    // Uncomment the following lines to test the WarehouseResourceImpl implementation
+    @Test
+    void returnsCreatedWarehouseWith201() {
+      given()
+          .contentType(ContentType.JSON)
+          .body(warehouseJson("MWH.IT.100", "HELMOND-001", 40, 10))
+          .when()
+          .post(PATH)
+          .then()
+          .statusCode(201)
+          .body("businessUnitCode", equalTo("MWH.IT.100"))
+          .body("location", equalTo("HELMOND-001"))
+          .body("capacity", equalTo(40))
+          .body("stock", equalTo(10));
+    }
 
-    // final String path = "warehouse";
+    @Test
+    void returnsBadRequestForDuplicateBusinessUnitCode() {
+      given()
+          .contentType(ContentType.JSON)
+          .body(warehouseJson("MWH.001", "EINDHOVEN-001", 20, 10))
+          .when()
+          .post(PATH)
+          .then()
+          .statusCode(400)
+          .body("code", equalTo(400))
+          .body("error", equalTo("A warehouse with business unit code MWH.001 already exists."));
+    }
 
-    // List all, should have all 3 products the database has initially:
-    // given()
-    //     .when()
-    //     .get(path)
-    //     .then()
-    //     .statusCode(200)
-    //     .body(
-    //         containsString("MWH.001"),
-    //         containsString("MWH.012"),
-    //         containsString("MWH.023"),
-    //         containsString("ZWOLLE-001"),
-    //         containsString("AMSTERDAM-001"),
-    //         containsString("TILBURG-001"));
+    @Test
+    void returnsBadRequestForUnknownLocation() {
+      given()
+          .contentType(ContentType.JSON)
+          .body(warehouseJson("MWH.IT.101", "UNKNOWN-001", 20, 10))
+          .when()
+          .post(PATH)
+          .then()
+          .statusCode(400)
+          .body("code", equalTo(400))
+          .body("error", equalTo("Location UNKNOWN-001 is not valid."));
+    }
 
-    // // Archive the ZWOLLE-001:
-    // given().when().delete(path + "/1").then().statusCode(204);
+    @Test
+    void returnsBadRequestWhenLocationWarehouseLimitIsReached() {
+      given()
+          .contentType(ContentType.JSON)
+          .body(warehouseJson("MWH.IT.102", "ZWOLLE-001", 20, 10))
+          .when()
+          .post(PATH)
+          .then()
+          .statusCode(400)
+          .body("code", equalTo(400))
+          .body(
+              "error",
+              equalTo(
+                  "The maximum number of warehouses at location ZWOLLE-001 has been reached."));
+    }
 
-    // // List all, ZWOLLE-001 should be missing now:
-    // given()
-    //     .when()
-    //     .get(path)
-    //     .then()
-    //     .statusCode(200)
-    //     .body(
-    //         not(containsString("ZWOLLE-001")),
-    //         containsString("AMSTERDAM-001"),
-    //         containsString("TILBURG-001"));
+    @Test
+    void returnsBadRequestWhenLocationCapacityIsExceeded() {
+      given()
+          .contentType(ContentType.JSON)
+          .body(warehouseJson("MWH.IT.103", "AMSTERDAM-001", 51, 10))
+          .when()
+          .post(PATH)
+          .then()
+          .statusCode(400)
+          .body("code", equalTo(400))
+          .body(
+              "error",
+              equalTo(
+                  "Warehouse capacity exceeds the maximum capacity for location AMSTERDAM-001."));
+    }
+
+    @Test
+    void returnsBadRequestWhenStockExceedsWarehouseCapacity() {
+      given()
+          .contentType(ContentType.JSON)
+          .body(warehouseJson("MWH.IT.104", "EINDHOVEN-001", 20, 21))
+          .when()
+          .post(PATH)
+          .then()
+          .statusCode(400)
+          .body("code", equalTo(400))
+          .body("error", equalTo("Warehouse capacity cannot be lower than its stock."));
+    }
+  }
+
+  @Nested
+  class ArchiveWarehouse {
+
+    @Test
+    void archivesWarehouse() {
+      // Archive endpoint coverage will be enabled when its implementation is completed.
+    }
+  }
+
+  private String warehouseJson(
+      String businessUnitCode, String location, int capacity, int stock) {
+    return """
+        {
+          "businessUnitCode": "%s",
+          "location": "%s",
+          "capacity": %d,
+          "stock": %d
+        }
+        """.formatted(businessUnitCode, location, capacity, stock);
   }
 }

@@ -16,8 +16,14 @@ public class WarehouseRepository implements WarehouseStore, PanacheRepository<Db
 
   @Override
   public void create(Warehouse warehouse) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'create'");
+    var dbWarehouse = new DbWarehouse();
+    dbWarehouse.businessUnitCode = warehouse.businessUnitCode;
+    dbWarehouse.location = warehouse.location;
+    dbWarehouse.capacity = warehouse.capacity;
+    dbWarehouse.stock = warehouse.stock;
+    dbWarehouse.createdAt = warehouse.createdAt;
+    dbWarehouse.archivedAt = warehouse.archivedAt;
+    persist(dbWarehouse);
   }
 
   @Override
@@ -34,7 +40,8 @@ public class WarehouseRepository implements WarehouseStore, PanacheRepository<Db
 
   @Override
   public Warehouse findByBusinessUnitCode(String buCode) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'findById'");
+    DbWarehouse warehouse =
+        find("businessUnitCode = ?1 and archivedAt is null", buCode).firstResult();
+    return warehouse == null ? null : warehouse.toWarehouse();
   }
 }
