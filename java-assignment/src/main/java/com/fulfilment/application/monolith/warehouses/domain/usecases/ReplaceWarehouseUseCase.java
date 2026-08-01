@@ -3,10 +3,12 @@ package com.fulfilment.application.monolith.warehouses.domain.usecases;
 import com.fulfilment.application.monolith.warehouses.domain.exceptions.WarehouseValidationException;
 import com.fulfilment.application.monolith.warehouses.domain.models.Location;
 import com.fulfilment.application.monolith.warehouses.domain.models.Warehouse;
+import com.fulfilment.application.monolith.warehouses.domain.ports.FulfilmentAssignmentMigrator;
 import com.fulfilment.application.monolith.warehouses.domain.ports.LocationResolver;
 import com.fulfilment.application.monolith.warehouses.domain.ports.ReplaceWarehouseOperation;
 import com.fulfilment.application.monolith.warehouses.domain.ports.WarehouseStore;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.transaction.Transactional;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
@@ -16,14 +18,19 @@ public class ReplaceWarehouseUseCase implements ReplaceWarehouseOperation {
 
   private final WarehouseStore warehouseStore;
   private final LocationResolver locationResolver;
+  private final FulfilmentAssignmentMigrator fulfilmentAssignmentMigrator;
 
   public ReplaceWarehouseUseCase(
-      WarehouseStore warehouseStore, LocationResolver locationResolver) {
+      WarehouseStore warehouseStore,
+      LocationResolver locationResolver,
+      FulfilmentAssignmentMigrator fulfilmentAssignmentMigrator) {
     this.warehouseStore = warehouseStore;
     this.locationResolver = locationResolver;
+    this.fulfilmentAssignmentMigrator = fulfilmentAssignmentMigrator;
   }
 
   @Override
+  @Transactional
   public void replace(Warehouse newWarehouse) {
     validateWarehouseData(newWarehouse);
     validateBusinessUnitCode(newWarehouse.businessUnitCode);
@@ -41,6 +48,7 @@ public class ReplaceWarehouseUseCase implements ReplaceWarehouseOperation {
     validateLocationCapacity(newWarehouse, location, otherWarehousesAtLocation);
 
     archiveAndCreate(currentWarehouse, newWarehouse);
+    fulfilmentAssignmentMigrator.moveAssignmentsToReplacement(newWarehouse.businessUnitCode);
   }
 
   private void validateWarehouseData(Warehouse warehouse) {

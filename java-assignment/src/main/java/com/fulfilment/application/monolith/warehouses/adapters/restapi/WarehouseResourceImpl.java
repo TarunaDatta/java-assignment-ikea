@@ -1,5 +1,6 @@
 package com.fulfilment.application.monolith.warehouses.adapters.restapi;
 
+import com.fulfilment.application.monolith.fulfilments.FulfilmentAssignmentRepository;
 import com.fulfilment.application.monolith.warehouses.adapters.database.WarehouseRepository;
 import com.fulfilment.application.monolith.warehouses.domain.exceptions.WarehouseValidationException;
 import com.fulfilment.application.monolith.warehouses.domain.ports.ArchiveWarehouseOperation;
@@ -9,6 +10,7 @@ import com.warehouse.api.WarehouseResource;
 import com.warehouse.api.beans.Warehouse;
 import jakarta.enterprise.context.RequestScoped;
 import jakarta.inject.Inject;
+import jakarta.persistence.LockModeType;
 import jakarta.transaction.Transactional;
 import jakarta.validation.constraints.NotNull;
 import jakarta.ws.rs.NotFoundException;
@@ -25,6 +27,7 @@ import java.util.Map;
 public class WarehouseResourceImpl implements WarehouseResource {
 
   @Inject private WarehouseRepository warehouseRepository;
+  @Inject private FulfilmentAssignmentRepository fulfilmentAssignmentRepository;
   @Inject private ArchiveWarehouseOperation archiveWarehouseOperation;
   @Inject private CreateWarehouseOperation createWarehouseOperation;
   @Inject private ReplaceWarehouseOperation replaceWarehouseOperation;
@@ -77,9 +80,14 @@ public class WarehouseResourceImpl implements WarehouseResource {
       throw new NotFoundException("Warehouse with id " + id + " does not exist.");
     }
 
-    var warehouse = warehouseRepository.findById(warehouseId);
+    var warehouse =
+        warehouseRepository.findById(warehouseId, LockModeType.PESSIMISTIC_WRITE);
     if (warehouse == null || warehouse.archivedAt != null) {
       throw new NotFoundException("Warehouse with id " + id + " does not exist.");
+    }
+    if (fulfilmentAssignmentRepository.countByWarehouse(warehouse.id) > 0) {
+      throw new WarehouseValidationException(
+          "Warehouse cannot be archived while it has active fulfilment assignments.");
     }
 
     archiveWarehouseOperation.archive(warehouse.toWarehouse());
@@ -89,9 +97,14 @@ public class WarehouseResourceImpl implements WarehouseResource {
   @Transactional
   public Warehouse replaceTheCurrentActiveWarehouse(
       String businessUnitCode, @NotNull Warehouse data) {
-    if (businessUnitCode == null
-        || businessUnitCode.isBlank()
-        || warehouseRepository.findByBusinessUnitCode(businessUnitCode) == null) {
+    var currentWarehouse =
+        businessUnitCode == null || businessUnitCode.isBlank()
+            ? null
+            : warehouseRepository
+                .find("businessUnitCode = ?1 and archivedAt is null", businessUnitCode)
+                .withLock(LockModeType.PESSIMISTIC_WRITE)
+                .firstResult();
+    if (currentWarehouse == null) {
       throw new NotFoundException(
           "Warehouse with business unit code " + businessUnitCode + " does not exist.");
     }

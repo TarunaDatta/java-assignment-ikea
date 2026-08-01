@@ -12,6 +12,7 @@ import static org.mockito.Mockito.when;
 import com.fulfilment.application.monolith.warehouses.domain.exceptions.WarehouseValidationException;
 import com.fulfilment.application.monolith.warehouses.domain.models.Location;
 import com.fulfilment.application.monolith.warehouses.domain.models.Warehouse;
+import com.fulfilment.application.monolith.warehouses.domain.ports.FulfilmentAssignmentMigrator;
 import com.fulfilment.application.monolith.warehouses.domain.ports.LocationResolver;
 import com.fulfilment.application.monolith.warehouses.domain.ports.WarehouseStore;
 import java.util.List;
@@ -22,13 +23,17 @@ class ReplaceWarehouseUseCaseTest {
 
   private WarehouseStore warehouseStore;
   private LocationResolver locationResolver;
+  private FulfilmentAssignmentMigrator fulfilmentAssignmentMigrator;
   private ReplaceWarehouseUseCase useCase;
 
   @BeforeEach
   void setUp() {
     warehouseStore = mock(WarehouseStore.class);
     locationResolver = mock(LocationResolver.class);
-    useCase = new ReplaceWarehouseUseCase(warehouseStore, locationResolver);
+    fulfilmentAssignmentMigrator = mock(FulfilmentAssignmentMigrator.class);
+    useCase =
+        new ReplaceWarehouseUseCase(
+            warehouseStore, locationResolver, fulfilmentAssignmentMigrator);
   }
 
   @Test
@@ -43,6 +48,7 @@ class ReplaceWarehouseUseCaseTest {
     var persistenceOrder = inOrder(warehouseStore);
     persistenceOrder.verify(warehouseStore).update(current);
     persistenceOrder.verify(warehouseStore).create(replacement);
+    verify(fulfilmentAssignmentMigrator).moveAssignmentsToReplacement("MWH.001");
     assertNotNull(current.archivedAt);
     assertNotNull(replacement.createdAt);
   }

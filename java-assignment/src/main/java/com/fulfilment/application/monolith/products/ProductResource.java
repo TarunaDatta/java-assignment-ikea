@@ -2,6 +2,7 @@ package com.fulfilment.application.monolith.products;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.fulfilment.application.monolith.fulfilments.FulfilmentAssignmentRepository;
 import io.quarkus.panache.common.Sort;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -27,6 +28,7 @@ import org.jboss.logging.Logger;
 public class ProductResource {
 
   @Inject ProductRepository productRepository;
+  @Inject FulfilmentAssignmentRepository fulfilmentAssignmentRepository;
 
   private static final Logger LOGGER = Logger.getLogger(ProductResource.class.getName());
 
@@ -87,6 +89,10 @@ public class ProductResource {
     Product entity = productRepository.findById(id);
     if (entity == null) {
       throw new WebApplicationException("Product with id of " + id + " does not exist.", 404);
+    }
+    if (fulfilmentAssignmentRepository.countByProduct(id) > 0) {
+      throw new WebApplicationException(
+          "Product cannot be deleted while it has active fulfilment assignments.", 409);
     }
     productRepository.delete(entity);
     return Response.status(204).build();

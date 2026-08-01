@@ -2,6 +2,7 @@ package com.fulfilment.application.monolith.stores;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.fulfilment.application.monolith.fulfilments.FulfilmentAssignmentRepository;
 import io.quarkus.panache.common.Sort;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -29,6 +30,7 @@ public class StoreResource {
 
   @Inject LegacyStoreManagerGateway legacyStoreManagerGateway;
   @Inject StoreService storeService;
+  @Inject FulfilmentAssignmentRepository fulfilmentAssignmentRepository;
 
   private static final Logger LOGGER = Logger.getLogger(StoreResource.class.getName());
 
@@ -95,6 +97,10 @@ public class StoreResource {
     Store entity = Store.findById(id);
     if (entity == null) {
       throw new WebApplicationException("Store with id of " + id + " does not exist.", 404);
+    }
+    if (fulfilmentAssignmentRepository.countByStore(id) > 0) {
+      throw new WebApplicationException(
+          "Store cannot be deleted while it has active fulfilment assignments.", 409);
     }
     entity.delete();
     return Response.status(204).build();
