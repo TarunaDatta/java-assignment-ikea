@@ -6,7 +6,7 @@ import java.util.List;
 public interface WarehouseStore {
 
   /** Serializes creation checks that share a business-unit code or location. */
-  void lockCreationConstraints(String businessUnitCode, String location);
+  void lockWarehouseConstraints(String businessUnitCode, String location);
 
   List<Warehouse> getAll();
 

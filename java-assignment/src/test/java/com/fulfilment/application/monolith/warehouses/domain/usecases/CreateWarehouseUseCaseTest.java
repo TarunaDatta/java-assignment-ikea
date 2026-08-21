@@ -39,7 +39,7 @@ class CreateWarehouseUseCaseTest {
     useCase.create(warehouse);
 
     verify(warehouseStore).create(warehouse);
-    verify(warehouseStore).lockCreationConstraints("MWH.100", "EINDHOVEN-001");
+    verify(warehouseStore).lockWarehouseConstraints("MWH.100", "EINDHOVEN-001");
   }
 
   @Test
@@ -69,7 +69,7 @@ class CreateWarehouseUseCaseTest {
     assertEquals(
         "A warehouse with business unit code MWH.001 already exists.", exception.getMessage());
 
-    verify(warehouseStore).lockCreationConstraints("MWH.001", "EINDHOVEN-001");
+    verify(warehouseStore).lockWarehouseConstraints("MWH.001", "EINDHOVEN-001");
     verify(warehouseStore, never()).create(warehouse);
   }
 

@@ -32,6 +32,8 @@ public class ReplaceWarehouseUseCase implements ReplaceWarehouseOperation {
   public void replace(Warehouse newWarehouse) {
     validateWarehouseData(newWarehouse);
     validateBusinessUnitCode(newWarehouse.businessUnitCode);
+    warehouseStore.lockWarehouseConstraints(
+        newWarehouse.businessUnitCode, newWarehouse.location);
 
     Warehouse currentWarehouse = findCurrentWarehouse(newWarehouse.businessUnitCode);
     Location location = resolveLocation(newWarehouse.location);

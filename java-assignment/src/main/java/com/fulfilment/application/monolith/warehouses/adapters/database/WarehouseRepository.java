@@ -10,7 +10,7 @@ import java.util.List;
 public class WarehouseRepository implements WarehouseStore, PanacheRepository<DbWarehouse> {
 
   @Override
-  public void lockCreationConstraints(String businessUnitCode, String location) {
+  public void lockWarehouseConstraints(String businessUnitCode, String location) {
     // Transaction-scoped PostgreSQL advisory locks also work when no warehouse row exists yet.
     // Namespacing the keys and always locking code before location avoids lock-order cycles.
     acquireTransactionLock("warehouse-code:" + businessUnitCode);

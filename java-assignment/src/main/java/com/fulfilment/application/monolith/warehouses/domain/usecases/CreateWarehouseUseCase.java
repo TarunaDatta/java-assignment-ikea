@@ -27,7 +27,7 @@ public class CreateWarehouseUseCase implements CreateWarehouseOperation {
   public void create(Warehouse warehouse) {
     validateWarehouseData(warehouse);
     validateBusinessUnitCodeIsPresent(warehouse.businessUnitCode);
-    warehouseStore.lockCreationConstraints(warehouse.businessUnitCode, warehouse.location);
+    warehouseStore.lockWarehouseConstraints(warehouse.businessUnitCode, warehouse.location);
     validateBusinessUnitCodeIsAvailable(warehouse.businessUnitCode);
 
     Location location = resolveLocation(warehouse.location);

@@ -46,6 +46,10 @@ class ReplaceWarehouseUseCaseTest {
     useCase.replace(replacement);
 
     var persistenceOrder = inOrder(warehouseStore);
+    persistenceOrder
+        .verify(warehouseStore)
+        .lockWarehouseConstraints("MWH.001", "ZWOLLE-001");
+    persistenceOrder.verify(warehouseStore).findByBusinessUnitCode("MWH.001");
     persistenceOrder.verify(warehouseStore).update(current);
     persistenceOrder.verify(warehouseStore).create(replacement);
     verify(fulfilmentAssignmentMigrator).moveAssignmentsToReplacement("MWH.001");
