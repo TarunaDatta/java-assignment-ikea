@@ -65,7 +65,7 @@ class FulfilmentAssignmentLifecycleTest {
         .body(
             Map.of(
                 "businessUnitCode", businessUnitCode,
-                "location", "EINDHOVEN-001",
+                "location", "AMSTERDAM-001",
                 "capacity", 10,
                 "stock", 0))
         .when()
