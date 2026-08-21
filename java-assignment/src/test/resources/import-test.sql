@@ -15,3 +15,6 @@ VALUES (2, 'MWH.012', 'AMSTERDAM-001', 50, 5, '2023-07-01', null);
 INSERT INTO warehouse(id, businessUnitCode, location, capacity, stock, createdAt, archivedAt)
 VALUES (3, 'MWH.023', 'TILBURG-001', 30, 27, '2021-02-01', null);
 ALTER SEQUENCE warehouse_seq RESTART WITH 4;
+
+CREATE UNIQUE INDEX IF NOT EXISTS warehouse_active_business_unit_code_uq
+ON warehouse (businessUnitCode) WHERE archivedAt IS NULL;

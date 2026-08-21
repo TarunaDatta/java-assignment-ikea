@@ -7,6 +7,7 @@ import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fulfilment.application.monolith.fulfilments.FulfilmentAssignmentRepository;
 import com.fulfilment.application.monolith.warehouses.adapters.database.DbWarehouse;
@@ -19,6 +20,14 @@ import io.restassured.http.ContentType;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.NotFoundException;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
@@ -180,6 +189,47 @@ class WarehouseResourceTest {
               equalTo(
                   "Warehouse capacity exceeds the maximum capacity for location AMSTERDAM-001."));
     }
+
+    @Test
+    void concurrentCreatesCannotUseTheSameBusinessUnitCode() throws Exception {
+      String code = TEST_CODE_PREFIX + "CONCURRENT-CODE";
+
+      List<Integer> statuses =
+          runConcurrentCreates(
+              warehouseJson(code, "EINDHOVEN-001", 20, 0),
+              warehouseJson(code, "EINDHOVEN-001", 20, 0));
+
+      assertEquals(List.of(201, 409), statuses);
+      assertEquals(1L, countActiveWarehouses(code));
+    }
+
+    @Test
+    void concurrentCreatesCannotExceedLocationWarehouseLimit() throws Exception {
+      String firstCode = TEST_CODE_PREFIX + "CONCURRENT-LIMIT-A";
+      String secondCode = TEST_CODE_PREFIX + "CONCURRENT-LIMIT-B";
+
+      List<Integer> statuses =
+          runConcurrentCreates(
+              warehouseJson(firstCode, "HELMOND-001", 20, 0),
+              warehouseJson(secondCode, "HELMOND-001", 20, 0));
+
+      assertEquals(List.of(201, 400), statuses);
+      assertEquals(1L, countActiveWarehouses(firstCode) + countActiveWarehouses(secondCode));
+    }
+
+    @Test
+    void concurrentCreatesCannotExceedLocationCapacity() throws Exception {
+      String firstCode = TEST_CODE_PREFIX + "CONCURRENT-CAPACITY-A";
+      String secondCode = TEST_CODE_PREFIX + "CONCURRENT-CAPACITY-B";
+
+      List<Integer> statuses =
+          runConcurrentCreates(
+              warehouseJson(firstCode, "EINDHOVEN-001", 40, 0),
+              warehouseJson(secondCode, "EINDHOVEN-001", 40, 0));
+
+      assertEquals(List.of(201, 400), statuses);
+      assertEquals(1L, countActiveWarehouses(firstCode) + countActiveWarehouses(secondCode));
+    }
   }
 
   @Nested
@@ -238,6 +288,27 @@ class WarehouseResourceTest {
     }
 
     @Test
+    void rejectsReplacementAtDifferentLocation() {
+      String businessUnitCode = TEST_CODE_PREFIX + "OTHER-LOCATION";
+      createWarehouse(businessUnitCode, false);
+
+      given()
+          .contentType(ContentType.JSON)
+          .body(warehouseJson(businessUnitCode, "AMSTERDAM-002", 20, 0))
+          .when()
+          .post(PATH + "/{businessUnitCode}/replacement", businessUnitCode)
+          .then()
+          .statusCode(400)
+          .body(
+              "error",
+              equalTo(
+                  "Replacement warehouse must be in the same location as the warehouse being replaced."));
+
+      assertEquals(1L, countActiveWarehouses(businessUnitCode));
+      assertEquals(0L, countArchivedWarehouses(businessUnitCode));
+    }
+
+    @Test
     void returnsNotFoundForUnknownBusinessUnitCode() {
       given()
           .contentType(ContentType.JSON)
@@ -281,6 +352,50 @@ class WarehouseResourceTest {
 
       assertEquals("Warehouse data is required.", exception.getMessage());
     }
+
+    @Test
+    void concurrentReplacementAndCreateCannotExceedLocationCapacity() throws Exception {
+      String replacementCode = TEST_CODE_PREFIX + "REPLACE-CREATE-REPLACEMENT";
+      String createCode = TEST_CODE_PREFIX + "REPLACE-CREATE-CREATE";
+      createWarehouse(replacementCode, false);
+
+      List<Integer> statuses =
+          runConcurrently(
+              () ->
+                  given()
+                      .contentType(ContentType.JSON)
+                      .body(warehouseJson(replacementCode, "EINDHOVEN-001", 50, 0))
+                      .when()
+                      .post(PATH + "/{businessUnitCode}/replacement", replacementCode)
+                      .statusCode(),
+              () ->
+                  given()
+                      .contentType(ContentType.JSON)
+                      .body(warehouseJson(createCode, "EINDHOVEN-001", 30, 0))
+                      .when()
+                      .post(PATH)
+                      .statusCode());
+
+      assertTrue(statuses.contains(400));
+      assertEquals(1L, statuses.stream().filter(status -> status < 300).count());
+      assertTrue(activeCapacityAt("EINDHOVEN-001") <= 70);
+    }
+
+    @Test
+    void concurrentReplacementsCannotExceedLocationCapacity() throws Exception {
+      String firstCode = TEST_CODE_PREFIX + "CONCURRENT-REPLACEMENT-A";
+      String secondCode = TEST_CODE_PREFIX + "CONCURRENT-REPLACEMENT-B";
+      createWarehouse(firstCode, false);
+      createWarehouse(secondCode, false);
+
+      List<Integer> statuses =
+          runConcurrently(
+              () -> replacementStatus(firstCode, 40),
+              () -> replacementStatus(secondCode, 40));
+
+      assertEquals(List.of(200, 400), statuses);
+      assertEquals(50, activeCapacityAt("EINDHOVEN-001"));
+    }
   }
 
   private Warehouse warehouseData() {
@@ -301,6 +416,56 @@ class WarehouseResourceTest {
           "stock": %d
         }
         """.formatted(businessUnitCode, location, capacity, stock);
+  }
+
+  private List<Integer> runConcurrentCreates(String firstBody, String secondBody)
+      throws Exception {
+    return runConcurrently(
+        () -> createStatus(firstBody),
+        () -> createStatus(secondBody));
+  }
+
+  private int createStatus(String body) {
+    return given().contentType(ContentType.JSON).body(body).when().post(PATH).statusCode();
+  }
+
+  private int replacementStatus(String businessUnitCode, int capacity) {
+    return given()
+        .contentType(ContentType.JSON)
+        .body(warehouseJson(businessUnitCode, "EINDHOVEN-001", capacity, 0))
+        .when()
+        .post(PATH + "/{businessUnitCode}/replacement", businessUnitCode)
+        .statusCode();
+  }
+
+  private List<Integer> runConcurrently(
+      Callable<Integer> firstRequest, Callable<Integer> secondRequest) throws Exception {
+    CountDownLatch ready = new CountDownLatch(2);
+    CountDownLatch start = new CountDownLatch(1);
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    try {
+      List<Future<Integer>> requests = new ArrayList<>();
+      for (Callable<Integer> request : List.of(firstRequest, secondRequest)) {
+        requests.add(
+            executor.submit(
+                () -> {
+                  ready.countDown();
+                  start.await();
+                  return request.call();
+                }));
+      }
+      ready.await();
+      start.countDown();
+
+      List<Integer> statuses = new ArrayList<>();
+      for (Future<Integer> request : requests) {
+        statuses.add(request.get());
+      }
+      Collections.sort(statuses);
+      return statuses;
+    } finally {
+      executor.shutdownNow();
+    }
   }
 
   private long createWarehouse(String businessUnitCode, boolean archived) {
@@ -333,5 +498,18 @@ class WarehouseResourceTest {
             () ->
                 warehouseRepository.count(
                     "businessUnitCode = ?1 and archivedAt is not null", businessUnitCode));
+  }
+
+  private int activeCapacityAt(String location) {
+    return QuarkusTransaction.requiringNew()
+        .call(
+            () ->
+                warehouseRepository
+                    .find("location = ?1 and archivedAt is null", location)
+                    .stream()
+                    .map(warehouse -> warehouse.capacity)
+                    .filter(java.util.Objects::nonNull)
+                    .mapToInt(Integer::intValue)
+                    .sum());
   }
 }

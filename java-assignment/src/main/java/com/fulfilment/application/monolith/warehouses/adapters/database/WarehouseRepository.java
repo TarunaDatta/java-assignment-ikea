@@ -10,6 +10,21 @@ import java.util.List;
 public class WarehouseRepository implements WarehouseStore, PanacheRepository<DbWarehouse> {
 
   @Override
+  public void lockWarehouseConstraints(String businessUnitCode, String location) {
+    // Transaction-scoped PostgreSQL advisory locks also work when no warehouse row exists yet.
+    // Namespacing the keys and always locking code before location avoids lock-order cycles.
+    acquireTransactionLock("warehouse-code:" + businessUnitCode);
+    acquireTransactionLock("warehouse-location:" + location);
+  }
+
+  private void acquireTransactionLock(String key) {
+    getEntityManager()
+        .createNativeQuery("select pg_advisory_xact_lock(hashtextextended(?1, 0))", Object.class)
+        .setParameter(1, key)
+        .getSingleResult();
+  }
+
+  @Override
   public List<Warehouse> getAll() {
     return find("archivedAt is null").stream().map(DbWarehouse::toWarehouse).toList();
   }

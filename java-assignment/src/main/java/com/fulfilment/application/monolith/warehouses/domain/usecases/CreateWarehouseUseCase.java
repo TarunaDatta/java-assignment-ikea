@@ -26,7 +26,9 @@ public class CreateWarehouseUseCase implements CreateWarehouseOperation {
   @Override
   public void create(Warehouse warehouse) {
     validateWarehouseData(warehouse);
-    validateBusinessUnitCode(warehouse.businessUnitCode);
+    validateBusinessUnitCodeIsPresent(warehouse.businessUnitCode);
+    warehouseStore.lockWarehouseConstraints(warehouse.businessUnitCode, warehouse.location);
+    validateBusinessUnitCodeIsAvailable(warehouse.businessUnitCode);
 
     Location location = resolveLocation(warehouse.location);
     List<Warehouse> warehousesAtLocation = findActiveWarehousesAt(location);
@@ -43,10 +45,13 @@ public class CreateWarehouseUseCase implements CreateWarehouseOperation {
     }
   }
 
-  private void validateBusinessUnitCode(String businessUnitCode) {
+  private void validateBusinessUnitCodeIsPresent(String businessUnitCode) {
     if (businessUnitCode == null || businessUnitCode.isBlank()) {
       throw new WarehouseValidationException("Business unit code is required.");
     }
+  }
+
+  private void validateBusinessUnitCodeIsAvailable(String businessUnitCode) {
     if (warehouseStore.findByBusinessUnitCode(businessUnitCode) != null) {
       throw new WarehouseConflictException(
           "A warehouse with business unit code " + businessUnitCode + " already exists.");

@@ -99,19 +99,25 @@ public class WarehouseResourceImpl implements WarehouseResource {
   @Transactional
   public Warehouse replaceTheCurrentActiveWarehouse(
       String businessUnitCode, @NotNull Warehouse data) {
-    var currentWarehouse =
-        businessUnitCode == null || businessUnitCode.isBlank()
-            ? null
-            : warehouseRepository
-                .find("businessUnitCode = ?1 and archivedAt is null", businessUnitCode)
-                .withLock(LockModeType.PESSIMISTIC_WRITE)
-                .firstResult();
-    if (currentWarehouse == null) {
+    if (businessUnitCode == null || businessUnitCode.isBlank()) {
       throw new NotFoundException(
           "Warehouse with business unit code " + businessUnitCode + " does not exist.");
     }
     if (data == null) {
       throw new WarehouseValidationException("Warehouse data is required.");
+    }
+
+    // Keep the same lock order as creation: logical code, logical location, then entity row.
+    // This prevents a create/replacement deadlock while serializing location-capacity checks.
+    warehouseRepository.lockWarehouseConstraints(businessUnitCode, data.getLocation());
+    var currentWarehouse =
+        warehouseRepository
+            .find("businessUnitCode = ?1 and archivedAt is null", businessUnitCode)
+            .withLock(LockModeType.PESSIMISTIC_WRITE)
+            .firstResult();
+    if (currentWarehouse == null) {
+      throw new NotFoundException(
+          "Warehouse with business unit code " + businessUnitCode + " does not exist.");
     }
 
     var warehouse = new com.fulfilment.application.monolith.warehouses.domain.models.Warehouse();

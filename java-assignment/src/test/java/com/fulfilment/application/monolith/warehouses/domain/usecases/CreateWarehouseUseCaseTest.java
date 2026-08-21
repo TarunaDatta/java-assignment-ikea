@@ -39,6 +39,7 @@ class CreateWarehouseUseCaseTest {
     useCase.create(warehouse);
 
     verify(warehouseStore).create(warehouse);
+    verify(warehouseStore).lockWarehouseConstraints("MWH.100", "EINDHOVEN-001");
   }
 
   @Test
@@ -58,18 +59,18 @@ class CreateWarehouseUseCaseTest {
   }
 
   @Test
-    void rejectsDuplicateBusinessUnitCode() {
-      Warehouse warehouse = warehouse("MWH.001", "EINDHOVEN-001", 40, 20);
-      when(warehouseStore.findByBusinessUnitCode("MWH.001")).thenReturn(new Warehouse());
+  void rejectsDuplicateBusinessUnitCode() {
+    Warehouse warehouse = warehouse("MWH.001", "EINDHOVEN-001", 40, 20);
+    when(warehouseStore.findByBusinessUnitCode("MWH.001")).thenReturn(new Warehouse());
 
-      WarehouseConflictException exception =
-          assertThrows(WarehouseConflictException.class, () -> useCase.create(warehouse));
+    WarehouseConflictException exception =
+        assertThrows(WarehouseConflictException.class, () -> useCase.create(warehouse));
 
-      assertEquals(
-          "A warehouse with business unit code MWH.001 already exists.",
-          exception.getMessage());
+    assertEquals(
+        "A warehouse with business unit code MWH.001 already exists.", exception.getMessage());
 
-      verify(warehouseStore, never()).create(warehouse);
+    verify(warehouseStore).lockWarehouseConstraints("MWH.001", "EINDHOVEN-001");
+    verify(warehouseStore, never()).create(warehouse);
   }
 
   @Test

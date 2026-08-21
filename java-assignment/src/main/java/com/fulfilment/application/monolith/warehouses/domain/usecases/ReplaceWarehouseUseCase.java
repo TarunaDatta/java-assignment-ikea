@@ -8,7 +8,6 @@ import com.fulfilment.application.monolith.warehouses.domain.ports.LocationResol
 import com.fulfilment.application.monolith.warehouses.domain.ports.ReplaceWarehouseOperation;
 import com.fulfilment.application.monolith.warehouses.domain.ports.WarehouseStore;
 import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.transaction.Transactional;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
@@ -30,13 +29,15 @@ public class ReplaceWarehouseUseCase implements ReplaceWarehouseOperation {
   }
 
   @Override
-  @Transactional
   public void replace(Warehouse newWarehouse) {
     validateWarehouseData(newWarehouse);
     validateBusinessUnitCode(newWarehouse.businessUnitCode);
+    warehouseStore.lockWarehouseConstraints(
+        newWarehouse.businessUnitCode, newWarehouse.location);
 
     Warehouse currentWarehouse = findCurrentWarehouse(newWarehouse.businessUnitCode);
     Location location = resolveLocation(newWarehouse.location);
+    validateSameLocation(currentWarehouse.location, newWarehouse.location);
     List<Warehouse> otherWarehousesAtLocation =
         findOtherActiveWarehousesAt(location, newWarehouse.businessUnitCode);
 
@@ -79,6 +80,13 @@ public class ReplaceWarehouseUseCase implements ReplaceWarehouseOperation {
           "Location " + locationIdentifier + " is not valid.");
     }
     return location;
+  }
+
+  private void validateSameLocation(String currentLocation, String replacementLocation) {
+    if (!Objects.equals(currentLocation, replacementLocation)) {
+      throw new WarehouseValidationException(
+          "Replacement warehouse must be in the same location as the warehouse being replaced.");
+    }
   }
 
   private List<Warehouse> findOtherActiveWarehousesAt(
